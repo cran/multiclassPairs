@@ -1,0 +1,17 @@
+34b06fb21cfeefe2f9e9d52f9793bfa6 *DESCRIPTION
+d4b7fa9ba6f45671596615e3cd88b5bc *NAMESPACE
+8c2be649bfbbb73a61813f66d80f151c *R/functions.R
+61039a9ee9483e6fd6b6c8dc06a1fe22 *man/ReadData.Rd
+c0baa015d7659c9f3b482ca607907b73 *man/cocluster_RF.Rd
+5037d686af7b496fd7b3b3c26519e377 *man/do_dunn_test.Rd
+dad316441bca10f474e22ac6f9df04f8 *man/filter_genes_TSP.Rd
+2ba260206c0b64013d6d76c7c0245e05 *man/group_TSP.Rd
+808683bae2dd9844247aee17028c20a7 *man/plot_binary_RF.Rd
+49c2ce579c5473d958ceb3f3ef446537 *man/plot_binary_TSP.Rd
+be07bdf09b160f259433d1dba9828c1b *man/predict_RF.Rd
+af48aa033a4cd23f64992db9abdb7e5e *man/predict_one_vs_rest_TSP.Rd
+fde27143cb2737637519f354b45b14ec *man/print-methods.Rd
+98ab782e38f547835b9b1cd47fbd3301 *man/sort_genes_RF.Rd
+49772cc444742f8a1ba408c80ddc181e *man/sort_rules_RF.Rd
+abc88892314c3e9999e4ca850e2b17d8 *man/train_RF.Rd
+b9634479075cfda99e33c5728f5d03f7 *man/train_one_vs_rest_TSP.Rd
