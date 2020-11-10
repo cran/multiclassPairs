@@ -59,6 +59,12 @@ object <- ReadData(Data = Data,
 genes_RF <- sort_genes_RF(data_object = object,
                           seed=123456, verbose = FALSE)
 
+# to get an idea of how many genes we will use
+# and how many rules will be generated
+# summary_genes_RF(sorted_genes_RF = genes_RF,
+#                  genes_altogether = c(10,20,50,100,150,200),
+#                  genes_one_vs_rest = c(10,20,50,100,150,200))
+
 # creat and sort rules
 # rules_RF <- sort_rules_RF(data_object = object,
 #                           sorted_genes_RF = genes_RF,
@@ -75,8 +81,17 @@ genes_RF <- sort_genes_RF(data_object = object,
 #   plot_boruta = FALSE,
 #   num.trees=c(100,200,300),
 #   stringsAsFactors = FALSE)
-
 # parameters
+
+# Or you can use expand.grid to generate dataframe with all parameter combinations
+# parameters <- expand.grid(
+#   gene_repetition=c(3,2,1),
+#   rules_one_vs_rest=0,
+#   rules_altogether=c(2,3,10),
+#   num.trees=c(100,500,1000),
+#   stringsAsFactors = FALSE)
+# parameters
+
 
 # test <- optimize_RF(data_object = object,
 #                     sorted_rules_RF = rules_RF,
@@ -131,6 +146,16 @@ genes_RF <- sort_genes_RF(data_object = object,
 #                top_anno = "ref",
 #                show_predictions = TRUE,
 #                title = "Training data")
+
+# not to run
+# Extract and plot the proximity matrix from the classifier for the training data
+# it takes long time for large data
+# proximity_mat <- proximity_matrix_RF(object = object,
+#                       classifier = RF_classifier,
+#                       plot=TRUE,
+#                       return_matrix=TRUE,
+#                       title = "Test",
+#                       cluster_cols = TRUE)
 
 # not to run
 # predict

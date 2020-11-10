@@ -193,6 +193,17 @@ ReadData <- function(Data,
     stop("NAs are not allowed in Platform!")
   }
 
+
+  # give warning message if the gene names have "-"
+  # This will give errors in RF models and Boruta and ranger
+  if (length(grep(x = rownames(Data_tmp), pattern = "-")) > 0) {
+    message("Gene names in the data have '-' symbol! This may generate errors during the training process of random forest! It is recommended to change these '-' to '_' or '.'")
+  }
+
+  if (length(grep(x = rownames(Data_tmp), pattern = ",")) > 0) {
+    message("Gene names in the data have ',' symbol! This may generate errors during the training process of random forest! It is recommended to change these ',' to '_' or '.'")
+  }
+
   # create the object
   object <- list(
     data = list(Data=Data_tmp,
@@ -932,6 +943,7 @@ train_one_vs_rest_TSP <- function(data_object,
                                   include_pivot=FALSE,
                                   one_vs_one_scores=FALSE,
                                   platform_wise_scores=FALSE,
+                                  disjoint = TRUE,
                                   seed=NULL,
                                   classes,
                                   SB_arg = list(),
@@ -1249,15 +1261,19 @@ train_one_vs_rest_TSP <- function(data_object,
     }
     set.seed(seed)
 
-    object_tmp[["classifiers"]][[cl]] <- switchBox::SWAP.Train.KTSP(
-      inputMat   = as.matrix(D),
-      krange     = k_range,
-      phenoGroup = group_TSP(L,cl),
-      FilterFunc = tmp_filter_fun,
-      score_fn   = tmp_score_fun,
-      classes    = c(cl, "rest"),
-      verbose    = verbose,
-      unlist(SB_arg))
+
+    # get the arguments for the final model training in SB package
+    args_tmp <- list(inputMat   = as.matrix(D),
+                     krange     = k_range,
+                     phenoGroup = group_TSP(L, cl),
+                     FilterFunc = tmp_filter_fun,
+                     score_fn   = tmp_score_fun,
+                     classes    = c(cl, "rest"),
+                     disjoint   = disjoint,
+                     verbose    = verbose)
+
+    args_tmp  <- c(args_tmp, SB_arg)
+    object_tmp[["classifiers"]][[cl]] <- do.call(switchBox::SWAP.Train.KTSP, args_tmp)
   }
 
   return(object_tmp)
@@ -1400,7 +1416,7 @@ predict_one_vs_rest_TSP <- function(classifier,
 
     # get scores for the predictions
     kappa <- switchBox::SWAP.KTSP.Statistics(inputMat = as.matrix(D),
-                                  classifier = c)
+                                             classifier = c)
 
     if (weighted_votes) {
       scores_df[,cl]<-rowSums(t(t(kappa$comparisons)*c$score))/sum(c$score)
@@ -1535,7 +1551,7 @@ plot_binary_TSP <- function(Data,
   }
 
   if (any(!names(classifier[["classifiers"]]) %in% classes)) {
-    message("Because the classes argument miss these classes then these classes will be removed from the heatmap:")
+    message("Classes argument misses the following classes, they will be removed from the heatmap:")
     message(paste0(names(classifier[["classifiers"]])[!names(classifier[["classifiers"]])
                                                       %in% classes], collapse = " "))
 
@@ -1572,26 +1588,26 @@ plot_binary_TSP <- function(Data,
     }
 
     # get the input Labels vector as it is
-    if ((is.character(ref) | is.factor(ref)) & length(ref) !=
-        1) {
+    if ((is.character(ref) | is.factor(ref)) & length(ref) != 1) {
       L <- as.character(ref)
     }
   }
 
-  # check the length of the ref labels
-  if (length(L) != ncol(D) & !is.null(ref)) {
-    message("Number of samples: ", ncol(D))
-    message("Labels length: ", length(L))
-    stop("Labels vector length are not equal to
-       samples in data")
-  }
-
   # no ref labels if the user did not input ref and the input
   # is not multiclassPairs_object
-  if (!is.null(ref) & class(Data)[1] != "multiclassPairs_object") {
+  if (is.null(ref) & class(Data)[1] != "multiclassPairs_object") {
     L <- NULL
   }
 
+  # check the length of the ref labels
+  if (!is.null(ref)) {
+    if (length(L) != ncol(D)) {
+      message("Number of samples: ", ncol(D))
+      message("Labels length: ", length(L))
+      stop("Labels vector length are not equal to
+       samples in data")
+    }
+  }
 
   ### get Platform labels ###
   # if the data is object
@@ -1630,18 +1646,20 @@ plot_binary_TSP <- function(Data,
     }
   }
 
-  # check the length of the platform labels
-  if (length(P) != ncol(D) & !is.null(platform)) {
-    message("Number of samples: ", ncol(D))
-    message("Labels length: ", length(P))
-    stop("Platform labels vector length are not equal to
-       samples in data")
-  }
-
   # no platform labels if the user did not input platform and
   # the input is not multiclassPairs_object
-  if (!is.null(platform) & class(Data)[1] != "multiclassPairs_object") {
+  if (is.null(platform) & class(Data)[1] != "multiclassPairs_object") {
     P <- NULL
+  }
+
+  # check the length of the platform labels
+  if (!is.null(platform)) {
+    if (length(P) != ncol(D)) {
+      message("Number of samples: ", ncol(D))
+      message("Labels length: ", length(P))
+      stop("Platform labels vector length are not equal to
+       samples in data")
+    }
   }
 
   ### get platforms_ord ###
@@ -1689,6 +1707,7 @@ plot_binary_TSP <- function(Data,
   }
   if (top_anno == "ref" & !show_ref) {
     message("show_ref was turned to TRUE because top_anno is 'ref'!")
+    show_ref <- TRUE
   }
 
   if (top_anno == "prediction" & is.null(pred)) {
@@ -1696,6 +1715,7 @@ plot_binary_TSP <- function(Data,
   }
   if (top_anno == "prediction" & !show_predictions) {
     message("show_predictions was turned to TRUE because top_anno is 'prediction'!")
+    show_predictions <- TRUE
   }
 
   if (top_anno == "platform" & is.null(P)) {
@@ -1703,6 +1723,7 @@ plot_binary_TSP <- function(Data,
   }
   if (top_anno == "platform" & !show_platform) {
     message("show_platform was turned to TRUE because top_anno is 'platform'!")
+    show_platform <- TRUE
   }
 
   if (any(!top_anno %in% c("ref", "prediction", "platform")) |
@@ -2066,7 +2087,7 @@ plot_binary_TSP <- function(Data,
 
     for(f in 1:ncol(binary)){
       for(g in 1:nrow(binary)){
-        rect(f-1,g,f,g-1,col=binary_col[binary[g,f]],border=F,lwd=0)
+        rect(f-1,g,f,g-1,col=binary_col[binary[g,f]],border=NA,lwd=0)
       }
     }
 
@@ -2188,6 +2209,17 @@ sort_genes_RF <- function (data_object,
   if (platform_wise == TRUE) {
     plat_vector <- data_object$data$Platform
     studies     <- unique(plat_vector)
+  }
+
+  # give warning message if the gene names have "-"
+  # This will give errors in RF models and Boruta and ranger
+  if (length(grep(x = rownames(D), pattern = "-")) > 0) {
+    message("Gene names in the data have '-' symbol! This may generate errors during the training process of random forest! It is recommended to change these '-' to '_' or '.'")
+    message("Note: '-' symbol in the gene names will be converted automatically to '_' by ranger function (i.e. random forest function)! This may cause problems when applying the classifier on data with gene names with '-' symbol (these genes will be missed)!")
+  }
+  if (length(grep(x = rownames(D), pattern = ",")) > 0) {
+    message("Gene names in the data have ',' symbol! This may generate errors during the training process of random forest! It is recommended to change these ',' to '_' or '.'")
+    message("Note: ',' symbol in the gene names will be converted automatically to '_' by ranger function (i.e. random forest function)! This may cause problems when applying the classifier on data with gene names with ',' symbol (these genes will be missed)!")
   }
 
   # Remove genes with NAs
@@ -2361,6 +2393,7 @@ sort_genes_RF <- function (data_object,
 
         rf_all <- ranger(x=t(D[, plat_samples]),
                          y=factor(L[plat_samples]),
+                         num.trees = num.trees,
                          importance = importance,
                          write.forest = write.forest,
                          keep.inbag = keep.inbag,
@@ -2909,6 +2942,7 @@ sort_rules_RF <- function (data_object,
 
         rf_all <- ranger(x=t(binary[, plat_samples]),
                          y=factor(L[plat_samples]),
+                         num.trees = num.trees,
                          importance = importance,
                          write.forest = write.forest,
                          keep.inbag = keep.inbag,
@@ -3243,22 +3277,67 @@ optimize_RF <- function(data_object,
       pred <- colnames(pred)[max.col(pred)]
     }
 
-    # produce the confusion matrix by Caret package
-    con <- confusionMatrix(data =factor(pred,
-                                        levels = groups),
-                           reference = factor(ref_lab,
-                                              levels = groups),
-                           mode = "everything")
+    if(length(groups)>2){
+      # produce the confusion matrix by Caret package
+      con <- confusionMatrix(data =factor(pred,
+                                          levels = groups),
+                             reference = factor(ref_lab,
+                                                levels = groups),
+                             mode = "everything")
 
-    res_list$confusionMatrix[[i]] <- con
+      res_list$confusionMatrix[[i]] <- con
 
-    for (o in overall) {
-      out_df[i,o] <- con$overall[[o]]
+      for (o in overall) {
+        out_df[i,o] <- con$overall[[o]]
+      }
+
+      for (b in byclass) {
+        for (cl in groups) {
+          out_df[i,paste(cl,b, sep = ".")] <- con$byClass[paste("Class:",cl),b]
+        }
+      }
     }
 
-    for (b in byclass) {
-      for (cl in groups) {
-        out_df[i,paste(cl,b, sep = ".")] <- con$byClass[paste("Class:",cl),b]
+    # for data with two classes only
+    # we need to run confusionMatrix twice
+    # and we need to change the positive group each time
+    if(length(groups)==2){
+
+      tmp_li <- list(A=NULL, B=NULL)
+      names(tmp_li) <- groups
+      res_list$confusionMatrix[[i]] <- tmp_li
+
+      # produce the confusion matrix by Caret package
+      con <- confusionMatrix(data =factor(pred,
+                                          levels = groups),
+                             reference = factor(ref_lab,
+                                                levels = groups),
+                             mode = "everything")
+
+      res_list$confusionMatrix[[i]][[groups[1]]] <- con
+
+      # overall can be done once only
+      for (o in overall) {
+        out_df[i,o] <- con$overall[[o]]
+      }
+
+      cl = groups[1]
+      for (b in byclass) {
+        out_df[i,paste(cl,b, sep = ".")] <- con$byClass[b]
+      }
+
+      # now we redo the confusion matrix using the other group as positive
+      con <- confusionMatrix(data =factor(pred,
+                                          levels = rev(groups)),
+                             reference = factor(ref_lab,
+                                                levels = rev(groups)),
+                             mode = "everything")
+
+      res_list$confusionMatrix[[i]][[groups[2]]] <- con
+
+      cl = groups[2]
+      for (b in byclass) {
+        out_df[i,paste(cl,b, sep = ".")] <- con$byClass[b]
       }
     }
 
@@ -3347,6 +3426,22 @@ train_RF <- function (data_object,
     message("These genes will be excluded from the analysis due to NAs:")
     message(capture.output(cat(rownames(D)[!complete.cases(D)])))
     D <- D[complete.cases(D),]
+  }
+
+  # give warning message if the gene names have "-" and ","
+  # This will give errors in RF models and Boruta and ranger
+  if (length(grep(x = rownames(D), pattern = "-")) > 0) {
+    message("Note: '-' symbol in the gene names will be converted automatically to '_' by ranger function (i.e. random forest function)! This may cause problems when applying the classifier on data with gene names with '-' symbol (these genes will be missed)!")
+    if (run_boruta) {
+          stop("Gene names in the data have '-' symbol! This may generate errors during the training process of random forest when run_boruta=TRUE! It is recommended to change these '-' to '_' or '.'")
+    }
+  }
+
+  if (length(grep(x = rownames(D), pattern = ",")) > 0) {
+    message("Note: ',' symbol in the gene names will be converted automatically to '_' by ranger function (i.e. random forest function)! This may cause problems when applying the classifier on data with gene names with ',' symbol (these genes will be missed)!")
+    if (run_boruta) {
+      stop("Gene names in the data have ',' symbol! This may generate errors during the training process of random forest when run_boruta=TRUE! It is recommended to change these ',' to '_' or '.'")
+    }
   }
 
   # Warning if wanted sorted rules > than the available rules - for altogether
@@ -3730,6 +3825,7 @@ predict_RF <- function(classifier,
       message(capture.output(cat(genes[!genes %in% rownames(D)])))
       message("Gene names should as rownames and sample names as columns!")
       message("Check the genes in classifier object to see all the needed genes.")
+      message("Check if '-' or ',' symbols in the gene names in your data. You may need to change it to '_' or '.'")
     }
 
     if (impute == FALSE) {
@@ -3988,7 +4084,7 @@ plot_binary_RF <- function(Data,
   }
 
   if (any(!tmp_n %in% classes)) {
-    message("Because the classes argument miss these classes then these classes will be removed from the heatmap:")
+    message("Classes argument misses the following classes, they will be removed from the heatmap:")
     message(paste0(tmp_n[!tmp_n %in% classes], collapse = " "))
   }
 
@@ -4113,7 +4209,7 @@ plot_binary_RF <- function(Data,
   pred <- NULL
 
   # if as_training is true then extract the prediction labels from the classifier
-  if (show_predictions & as_training) {
+  if ((show_predictions & as_training) | (show_scores & as_training)) {
 
     tmp_here <- classifier$RF_scheme$RF_classifier$predictions
 
@@ -4206,15 +4302,18 @@ plot_binary_RF <- function(Data,
   }
   if (top_anno == "ref" & !show_ref) {
     message("show_ref was turned to TRUE because top_anno is 'ref'!")
+    show_ref <- TRUE
   }
 
   if (top_anno == "prediction" & is.null(pred)) {
+    message("Be sure that show_predictions = TRUE!")
     stop("top annotation (top_anno) is prediction while there is no prediction dataframe available!
          Use predict_RF function to generate it or use as_training to extract predictions from the classifier object if the plot is for training data!")
   }
 
   if (top_anno == "prediction" & !show_predictions) {
     message("show_predictions was turned to TRUE because top_anno is 'prediction'!")
+    show_predictions <- TRUE
   }
 
   if (top_anno == "platform" & is.null(P)) {
@@ -4222,6 +4321,7 @@ plot_binary_RF <- function(Data,
   }
   if (top_anno == "platform" & !show_platform) {
     message("show_platform was turned to TRUE because top_anno is 'platform'!")
+    show_platform <- TRUE
   }
 
   if (any(!top_anno %in% c("ref", "prediction", "platform")) |
@@ -4582,7 +4682,7 @@ plot_binary_RF <- function(Data,
 
   for(f in 1:ncol(binary)){
     for(g in 1:nrow(binary)){
-      rect(f-1,g,f,g-1,col=binary_col[binary[g,f]],border=F,lwd=0)
+      rect(f-1,g,f,g-1,col=binary_col[binary[g,f]],border= NA,lwd=0)
     }
   }
 
@@ -4638,21 +4738,23 @@ plot_binary_RF <- function(Data,
   }
 }
 
-# coclustering plot for RF training data
-cocluster_RF <- function(object,
-                         classifier,
-                         title = "",
-                         top_anno = c("ref","platform")[1],
-                         classes = NULL,
-                         sam_order = NULL,
-                         ref_col = NULL,
-                         platform_col = NULL,
-                         platforms_ord = NULL,
-                         show_platform = TRUE,
-                         cluster_cols = FALSE,
-                         legend = TRUE,
-                         anno_height = 0.03,
-                         margin = c(0, 5, 0, 5)){
+# proximity_matrix_RF and plot for RF training data
+proximity_matrix_RF <- function(object,
+                                classifier,
+                                plot=TRUE,
+                                return_matrix=TRUE,
+                                title = "",
+                                top_anno = c("ref","platform")[1],
+                                classes = NULL,
+                                sam_order = NULL,
+                                ref_col = NULL,
+                                platform_col = NULL,
+                                platforms_ord = NULL,
+                                show_platform = TRUE,
+                                cluster_cols = FALSE,
+                                legend = TRUE,
+                                anno_height = 0.03,
+                                margin = c(0, 5, 0, 5)){
   ### get classifier ###
   # check classifier object
   if (class(classifier)[1] != "rule_based_RandomForest") {
@@ -4690,6 +4792,15 @@ cocluster_RF <- function(object,
   #
   if (is.null(C$inbag.counts)) {
     stop("call ranger with keep.inbag = TRUE")
+  }
+
+  #
+  if (!is.logical(plot) | !is.logical(return_matrix)){
+    stop("plot and return_matrix arguments should be logical!")
+  }
+
+  if (!plot & !return_matrix) {
+    stop("At least one of plot and return_matrix arguments should be TRUE!")
   }
 
   ### title ###
@@ -4865,6 +4976,10 @@ cocluster_RF <- function(object,
   lab       <- lab[sam_ord]
   prox      <- prox[rev(sam_ord),sam_ord]
 
+  if (return_matrix){
+    prox_return <- prox
+  }
+
   sam_names <- sam_names[sam_ord]
 
   num_sam   <- ncol(D)
@@ -4875,92 +4990,51 @@ cocluster_RF <- function(object,
   splits <- table(lab)[order(match(names(table(lab)), groups))]
 
   ### to keep the par settings from the user
-  oldpar <- par(no.readonly = TRUE)
-  on.exit(par(oldpar))
+  # here
+  if (plot) {
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar))
 
-  ### plot top_anno ###
-  {
-    # Subtype annotation
-    AreaStart <- 0.94
-    SizeUnit  <- anno_height
-    Size <- SizeUnit * 1
-    AreaEnd <- AreaStart - Size
-    par(fig = c(0, 1, AreaEnd, AreaStart), mar = margin,
-        mgp = c(3, 0.5, 0), new = FALSE)
-    plot(c(0, 1), c(0, 1), type = "n", xaxs = "i", yaxs = "i",
-         xlab = "", ylab = "", main = "", xlim = c(0, num_sam),
-         ylim = c(0, 1), xaxt = "n", yaxt = "n", bty = "n")
-
-    if (is.null(sam_order)){
-      # headlines
-      text_positions <- cumsum(splits)[1]/2
-      for (i in 1:(length(cumsum(splits)) - 1)) {
-        text_positions <- c(text_positions,
-                            ((cumsum(splits)[i + 1] -
-                                cumsum(splits)[i])/2 +
-                               cumsum(splits)[i]))
-      }
-
-      # smaller headlines
-      mtext(groups, side = 3, line = 0, outer = FALSE, at = text_positions,
-            adj = NA, padj = NA, cex = 0.8, col = groups_col,
-            font = NA)
-    }
-    mtext(title, side = 3, line = -1, outer = TRUE, font = 2)
-
-
-    # draw the subtypes
-    axis(side = 2, at = 0.5,
-         labels = c("ref"="Ref. labels",
-                    "prediction"="Predictions",
-                    "platform"="Platform/Study")[top_anno],
-         las = 1, cex.axis = 0.7, tick = 0)
-    for (f in groups) {
-      for (g in which(lab == f)) {
-        rect(g - 1, 0, g, 1, col = groups_col[f], border = NA)
-      }
-    }
-
-    # the box and the white lines
-    box(lwd = 1)
-    li <- cumsum(splits)
-    abline(v=li, lwd = 1.5, lty=1, col="black")
-  }
-
-  ### plot next annos ###
-  for (i in anno_ord) {
+    ### plot top_anno ###
     {
       # Subtype annotation
-      Gap      <- 0.0
-      AreaStart<- AreaStart-Size-Gap
-      SizeUnit <- anno_height
-      Size     <- SizeUnit*1
-      AreaEnd  <- AreaStart-Size
-
+      AreaStart <- 0.94
+      SizeUnit  <- anno_height
+      Size <- SizeUnit * 1
+      AreaEnd <- AreaStart - Size
       par(fig = c(0, 1, AreaEnd, AreaStart), mar = margin,
-          mgp = c(3, 0.5, 0), new = TRUE)
+          mgp = c(3, 0.5, 0), new = FALSE)
       plot(c(0, 1), c(0, 1), type = "n", xaxs = "i", yaxs = "i",
            xlab = "", ylab = "", main = "", xlim = c(0, num_sam),
            ylim = c(0, 1), xaxt = "n", yaxt = "n", bty = "n")
 
-      # draw the annotation name
+      if (is.null(sam_order)){
+        # headlines
+        text_positions <- cumsum(splits)[1]/2
+        for (i in 1:(length(cumsum(splits)) - 1)) {
+          text_positions <- c(text_positions,
+                              ((cumsum(splits)[i + 1] -
+                                  cumsum(splits)[i])/2 +
+                                 cumsum(splits)[i]))
+        }
+
+        # smaller headlines
+        mtext(groups, side = 3, line = 0, outer = FALSE, at = text_positions,
+              adj = NA, padj = NA, cex = 0.8, col = groups_col,
+              font = NA)
+      }
+      mtext(title, side = 3, line = -1, outer = TRUE, font = 2)
+
+
+      # draw the subtypes
       axis(side = 2, at = 0.5,
            labels = c("ref"="Ref. labels",
-                      "platform"="Platform/Study")[i],
+                      "prediction"="Predictions",
+                      "platform"="Platform/Study")[top_anno],
            las = 1, cex.axis = 0.7, tick = 0)
-
-      if (i == "ref") {
-        tmp_color <- ref_col
-        tmp_lab   <- L
-      }
-      if (i == "platform") {
-        tmp_color <- platform_col
-        tmp_lab   <- P
-      }
-
-      for (f in unique(tmp_lab)) {
-        for (g in which(tmp_lab == f)) {
-          rect(g - 1, 0, g, 1, col = tmp_color[f], border = NA)
+      for (f in groups) {
+        for (g in which(lab == f)) {
+          rect(g - 1, 0, g, 1, col = groups_col[f], border = NA)
         }
       }
 
@@ -4969,64 +5043,113 @@ cocluster_RF <- function(object,
       li <- cumsum(splits)
       abline(v=li, lwd = 1.5, lty=1, col="black")
     }
-  }
 
-  ### plot binary heatmaps ###
-  # to know the height of the heatmap
-  Size <- AreaEnd-0.08-0.08
+    ### plot next annos ###
+    for (i in anno_ord) {
+      {
+        # Subtype annotation
+        Gap      <- 0.0
+        AreaStart<- AreaStart-Size-Gap
+        SizeUnit <- anno_height
+        Size     <- SizeUnit*1
+        AreaEnd  <- AreaStart-Size
 
-  ###
-  Gap       <- 0.005
-  AreaStart <- AreaEnd-Gap
-  AreaEnd   <- AreaStart-Size
-  ###
+        par(fig = c(0, 1, AreaEnd, AreaStart), mar = margin,
+            mgp = c(3, 0.5, 0), new = TRUE)
+        plot(c(0, 1), c(0, 1), type = "n", xaxs = "i", yaxs = "i",
+             xlab = "", ylab = "", main = "", xlim = c(0, num_sam),
+             ylim = c(0, 1), xaxt = "n", yaxt = "n", bty = "n")
 
-  par(fig = c(0, 1, AreaEnd, AreaStart),
-      mar = margin, mgp = c(3, 0.5, 0), new=TRUE)
+        # draw the annotation name
+        axis(side = 2, at = 0.5,
+             labels = c("ref"="Ref. labels",
+                        "platform"="Platform/Study")[i],
+             las = 1, cex.axis = 0.7, tick = 0)
 
-  myplot <- plot(c(0,1),c(0,1), type="n", xaxs='i', yaxs='i',
-                 xlab = "", ylab = "", main = "",
-                 xlim = c(0, num_sam), ylim = c(0, num_sam),
-                 xaxt = "n", yaxt = "n", bty = "n")
+        if (i == "ref") {
+          tmp_color <- ref_col
+          tmp_lab   <- L
+        }
+        if (i == "platform") {
+          tmp_color <- platform_col
+          tmp_lab   <- P
+        }
 
-  HM_colors <- colorRampPalette(c("white","darkblue"))(100)
+        for (f in unique(tmp_lab)) {
+          for (g in which(tmp_lab == f)) {
+            rect(g - 1, 0, g, 1, col = tmp_color[f], border = NA)
+          }
+        }
 
-  prox <- round(prox, 2)
-  prox <- prox*100
-
-  prox <- as.matrix(prox)
-  prox[which(prox<1)]   <- 1
-  prox[which(prox>100)] <- 100
-
-  for(f in 1:ncol(prox)){
-    for(g in 1:nrow(prox)){
-      rect(f-1,g,f,g-1,col=HM_colors[prox[g,f]],border=FALSE,lwd=0)
+        # the box and the white lines
+        box(lwd = 1)
+        li <- cumsum(splits)
+        abline(v=li, lwd = 1.5, lty=1, col="black")
+      }
     }
-  }
 
-  box(lwd=1)
+    ### plot binary heatmaps ###
+    # to know the height of the heatmap
+    Size <- AreaEnd-0.08-0.08
 
-  ### plot legends
-  if (legend) {
-    par(fig = c(0, 1, 0.02, (AreaEnd-0.01)),
+    ###
+    Gap       <- 0.005
+    AreaStart <- AreaEnd-Gap
+    AreaEnd   <- AreaStart-Size
+    ###
+
+    par(fig = c(0, 1, AreaEnd, AreaStart),
         mar = margin, mgp = c(3, 0.5, 0), new=TRUE)
-    plot(c(0,1),c(0,1), type="n", xaxs='i', yaxs='i',
-         xlab = "", ylab = "", main = "",
-         xlim = c(0, num_sam), ylim = c(0, 1),
-         xaxt = "n", yaxt = "n", bty = "n")
 
-    if (!is.null(P) & show_platform) {
-      legend(x = "topright", title = "Platform/study",
-             ncol = length(platforms_ord), cex = 0.5,
-             legend = platforms_ord,
-             fill = platform_col)
+    myplot <- plot(c(0,1),c(0,1), type="n", xaxs='i', yaxs='i',
+                   xlab = "", ylab = "", main = "",
+                   xlim = c(0, num_sam), ylim = c(0, num_sam),
+                   xaxt = "n", yaxt = "n", bty = "n")
+
+    HM_colors <- colorRampPalette(c("white","darkblue"))(100)
+
+    prox <- round(prox, 2)
+    prox <- prox*100
+
+    prox <- as.matrix(prox)
+    prox[which(prox<1)]   <- 1
+    prox[which(prox>100)] <- 100
+
+    for(f in 1:ncol(prox)){
+      for(g in 1:nrow(prox)){
+        rect(f-1,g,f,g-1,col=HM_colors[prox[g,f]],border=NA,lwd=0)
+      }
     }
 
-    legend(x = "topleft", title = "Ref labels",
-           ncol = length(classes), cex = 0.5,
-           legend = names(ref_col),
-           fill = ref_col)
+    box(lwd=1)
+
+    ### plot legends
+    if (legend) {
+      par(fig = c(0, 1, 0.02, (AreaEnd-0.01)),
+          mar = margin, mgp = c(3, 0.5, 0), new=TRUE)
+      plot(c(0,1),c(0,1), type="n", xaxs='i', yaxs='i',
+           xlab = "", ylab = "", main = "",
+           xlim = c(0, num_sam), ylim = c(0, 1),
+           xaxt = "n", yaxt = "n", bty = "n")
+
+      if (!is.null(P) & show_platform) {
+        legend(x = "topright", title = "Platform/study",
+               ncol = length(platforms_ord), cex = 0.5,
+               legend = platforms_ord,
+               fill = platform_col)
+      }
+
+      legend(x = "topleft", title = "Ref labels",
+             ncol = length(classes), cex = 0.5,
+             legend = names(ref_col),
+             fill = ref_col)
+    }
   }
+
+  # return proximity matrix
+  if (return_matrix){
+    return(prox_return)
+   }
 }
 
 ##### print functions #####
@@ -5183,7 +5306,7 @@ print.RandomForest_sorted_rules <- function(x, ...) {
           if (i == "sorted_rules") {
             for (z in names(x[[y]][[i]])) {
               cat("        ","- class:",z,":",
-                  length(x[[y]][[i]][[z]])," sorted rules\n")
+                  nrow(x[[y]][[i]][[z]])," sorted rules\n")
             }
           }
 
