@@ -1,3 +1,12 @@
+# multiclassPairs v0.3.1 (Release date: 2020-11-16)
+
+### changes
+* replace the mode imputation method by kNN method in predict_RF function.
+* train_RF now stores the whole binary matrix instead of mode matrix.
+* change work-flow figures in the tutorial.
+* the predict_RF function can predict matrix with one sample with no error
+
+
 # multiclassPairs v0.3.0 (Release date: 2020-11-02)
 
 ### changes:

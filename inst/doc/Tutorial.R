@@ -31,7 +31,7 @@ if (!requireNamespace("multiclassPairs", quietly = TRUE)) {
 #    install.packages("devtools")
 #  }
 #  library(devtools) # this package is needed to install from GitHub
-#  install_github("NourMarzouka/multiclassPairs")
+#  install_github("NourMarzouka/multiclassPairs", build_vignettes = TRUE)
 #}
 
 # Install the dependencies from Bioconductor
@@ -50,7 +50,7 @@ if (!requireNamespace("switchBox", quietly = TRUE)) {
 library(multiclassPairs)
 
 ## ---- echo=FALSE,fig.cap="Workflow in multiclassPairs R package: Functions are colored in green."----
-knitr::include_graphics("images/workflow_v0_2_1.png")
+knitr::include_graphics("images/workflow_v0_3.png")
 
 ## ---- message=FALSE-----------------------------------------------------------
 library(multiclassPairs)
