@@ -1,11 +1,11 @@
-3b12e7d70c3e53dcf094e8aa2a59e555 *DESCRIPTION
+81d8b753127c083fdc9fde1b5a7a7fdc *DESCRIPTION
 2e8c2b5c7fc7a2bf00ae7bf23d3dba17 *NAMESPACE
-6df1a9c02d6fba5a283f60758a457fed *NEWS.md
-493e9ed6c371bbf96073e6bf97feb0dd *R/functions.R
+a7968ccc3956cf8d4ad92ff925f38810 *NEWS.md
+b4a01d5258d5e445018da7d92d1a340a *R/functions.R
 0d87317ce4f05d912f40d1d8145e6c4c *build/vignette.rds
 f9d5e6c418b7df33918ac1d0f249fd25 *inst/doc/Tutorial.R
 377de9947f479b3a18a701ef941474aa *inst/doc/Tutorial.Rmd
-bd097655fcc7af1b290d3dd95bc31d11 *inst/doc/Tutorial.html
+94a883315b1ce15f2461b57e1caf8429 *inst/doc/Tutorial.html
 48a9e25ddfcfe28bd6221d69ea0b9c98 *man/ReadData.Rd
 5037d686af7b496fd7b3b3c26519e377 *man/do_dunn_test.Rd
 18d7362b47dc69617996f56945f062c7 *man/filter_genes_TSP.Rd
